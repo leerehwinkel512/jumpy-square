@@ -8,14 +8,14 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define BUTTON_PIN 0       // Change this to your button's pin
-#define GRAVITY 0.25        // Gravity effect on the player (half strength)
-#define JUMP_FORCE -1      // Jump force of the player
+#define GRAVITY 1          // Gravity effect on the player
+#define JUMP_FORCE -3      // Jump force of the player
 #define PLAYER_SIZE 5      // Size of the player square
 #define OBSTACLE_WIDTH 10  // Width of the obstacle
 #define OBSTACLE_GAP 20    // Gap between the top and bottom obstacles
 #define OBSTACLE_SPEED 2   // Speed of obstacles
-#define MIN_OBS_DELAY 500  // Min time delay between obstacles
-#define MAX_OBS_DELAY 2000 // Max time delay between obstacles
+#define MIN_OBS_DELAY 1500 // Min time delay between obstacles
+#define MAX_OBS_DELAY 2500 // Max time delay between obstacles
 #define PLAYER_START_X (SCREEN_WIDTH / 4) // Player's starting x position
 
 // Position of obstacles
@@ -29,8 +29,8 @@ unsigned long lastObstacleTime = 0; // Time since last obstacle added
 unsigned long nextObstacleTime = 0; // Time when the next obstacle should be added
 
 // Player position and speed
-float playerY = SCREEN_HEIGHT / 2;
-float velocityY = 0;
+int playerY = SCREEN_HEIGHT / 2;
+int velocityY = 0;
 
 unsigned long points = 0; // Point counter
 
