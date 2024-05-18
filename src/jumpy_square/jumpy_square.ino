@@ -14,7 +14,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define JUMP_FORCE -12     // Jump force of the player
 #define PLAYER_SIZE 5      // Size of the player square
 #define OBSTACLE_SIZE 10   // Size of the square obstacle
-#define OBSTACLE_SPEED 1   // Speed of obstacles
+#define OBSTACLE_SPEED 2   // Speed of obstacles
 #define MIN_OBS_DELAY 250  // Min time delay between obstacles
 #define MAX_OBS_DELAY 2000 // Max time delay between obstacles
 #define PLAYER_GROUND (SCREEN_HEIGHT - PLAYER_SIZE) // Ground level for the player
