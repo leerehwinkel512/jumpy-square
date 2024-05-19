@@ -7,29 +7,31 @@
 #define OLED_RESET    -1 // No reset pin
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#define BUTTON_PIN 0       // Change this to your button's pin
-#define GRAVITY 0.25        // Gravity effect on the player (half strength)
-#define JUMP_FORCE -1      // Jump force of the player
-#define PLAYER_SIZE 5      // Size of the player square
-#define OBSTACLE_WIDTH 10  // Width of the obstacle
-#define OBSTACLE_GAP 20    // Gap between the top and bottom obstacles
-#define OBSTACLE_SPEED 2   // Speed of obstacles
-#define MIN_OBS_DELAY 500  // Min time delay between obstacles
-#define MAX_OBS_DELAY 2000 // Max time delay between obstacles
+#define BUTTON_PIN 0            // Change this to your button's pin
+#define GRAVITY 0.75            // Gravity effect on the player
+#define JUMP_FORCE -8           // Jump force of the player
+#define PLAYER_SIZE 5           // Size of the player square
+#define MIN_PLATFORM_WIDTH 30   // Minimum width of the platform
+#define MAX_PLATFORM_WIDTH 50   // Maximum width of the platform
+#define PLATFORM_HEIGHT 2       // Height of the platform
+#define PLATFORM_GAP 2         // Minimum vertical gap between platforms
+#define PLATFORM_SPEED 3        // Speed of platforms
+#define MIN_PLATFORM_DELAY 100  // Min time delay between platforms
+#define MAX_PLATFORM_DELAY 250 // Max time delay between platforms
 #define PLAYER_START_X (SCREEN_WIDTH / 4) // Player's starting x position
 
-// Position of obstacles
-struct Obstacle {
-  int x, gapY;
+// Position of platforms
+struct Platform {
+  int x, y, width;
 };
 
-std::vector<Obstacle> obstacles; // Holds vector of obstacles on screen
+std::vector<Platform> platforms; // Holds vector of platforms on screen
 
-unsigned long lastObstacleTime = 0; // Time since last obstacle added
-unsigned long nextObstacleTime = 0; // Time when the next obstacle should be added
+unsigned long lastPlatformTime = 0; // Time since last platform added
+unsigned long nextPlatformTime = 0; // Time when the next platform should be added
 
 // Player position and speed
-float playerY = SCREEN_HEIGHT / 2;
+float playerY;
 float velocityY = 0;
 
 unsigned long points = 0; // Point counter
@@ -46,12 +48,13 @@ void setup() {
   }
 
   showStartupLogo();
+  startGame();
 }
 
 void loop() {
   handleJump();
   updatePlayer();
-  updateObstacles();
+  updatePlatforms();
   checkCollisions();
   updatePoints();
   render();
@@ -63,7 +66,7 @@ void showStartupLogo() {
   display.setTextSize(2);
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
-  display.println("Flappy");
+  display.println("Jumpy");
   display.print("Square");
 
   display.display();
@@ -71,9 +74,15 @@ void showStartupLogo() {
 }
 
 void handleJump() {
-  // If button pressed, apply jump force
-  if (digitalRead(BUTTON_PIN) == LOW) {
-    velocityY = JUMP_FORCE;
+  // If button pressed, apply jump force only if standing on a platform
+  if (digitalRead(BUTTON_PIN) == LOW && velocityY == 0) {
+    for (Platform plat : platforms) {
+      if (playerY + PLAYER_SIZE == plat.y && 
+          PLAYER_START_X + PLAYER_SIZE > plat.x && PLAYER_START_X < plat.x + plat.width) {
+        velocityY = JUMP_FORCE;
+        break;
+      }
+    }
   }
 }
 
@@ -82,15 +91,8 @@ void updatePlayer() {
   playerY += velocityY;
   velocityY += GRAVITY;
 
-  // Top collision, end game
-  if (playerY < 0) {
-    playerY = 0;
-    gameOver();
-  }
-
-  // Ground collision, end game
+  // Bottom collision, end game
   if (playerY > SCREEN_HEIGHT - PLAYER_SIZE) {
-    playerY = SCREEN_HEIGHT - PLAYER_SIZE;
     gameOver();
   }
 }
@@ -99,37 +101,54 @@ void updatePoints() {
   points++; // Increment points over time
 }
 
-void updateObstacles() {
+void updatePlatforms() {
   unsigned long currentTime = millis();
 
-  if (currentTime >= nextObstacleTime) {
-    // Add a new obstacle with a random gapY position
-    int gapY = random(OBSTACLE_GAP, SCREEN_HEIGHT - OBSTACLE_GAP);
-    obstacles.push_back({SCREEN_WIDTH, gapY});
+  if (currentTime >= nextPlatformTime) {
+    // Add a new platform with a random y position not higher than the middle of the screen
+    int platformY = random(SCREEN_HEIGHT / 2, SCREEN_HEIGHT - PLATFORM_HEIGHT - PLATFORM_GAP);
+    int platformWidth = random(MIN_PLATFORM_WIDTH, MAX_PLATFORM_WIDTH);
 
-    // Random delay for next obstacle
-    nextObstacleTime = currentTime + random(MIN_OBS_DELAY, MAX_OBS_DELAY);
+    // Ensure no overlap on the x-axis
+    bool overlap = false;
+    if (!platforms.empty()) {
+      Platform lastPlatform = platforms.back();
+      if (lastPlatform.x < SCREEN_WIDTH && lastPlatform.x + lastPlatform.width > SCREEN_WIDTH) {
+        overlap = true;
+      }
+    }
+
+    if (!overlap) {
+      platforms.push_back({SCREEN_WIDTH, platformY, platformWidth});
+      // Random delay for next platform
+      nextPlatformTime = currentTime + random(MIN_PLATFORM_DELAY, MAX_PLATFORM_DELAY);
+    } else {
+      // Delay next platform addition by 10 ms
+      nextPlatformTime = currentTime + 400;
+    }
   }
 
-  // Loop over all obstacles in the vector and update their position
-  for (int i = 0; i < obstacles.size(); i++) {
-    obstacles[i].x -= OBSTACLE_SPEED; // Move obstacle to the left
+  // Loop over all platforms in the vector and update their position
+  for (int i = 0; i < platforms.size(); i++) {
+    platforms[i].x -= PLATFORM_SPEED; // Move platform to the left
 
-    // Remove obstacle if it goes off screen
-    if (obstacles[i].x < -OBSTACLE_WIDTH) {
-      obstacles.erase(obstacles.begin() + i);
+    // Remove platform if it goes off screen
+    if (platforms[i].x < -platforms[i].width) {
+      platforms.erase(platforms.begin() + i);
       i--;
     }
   }
 }
 
 void checkCollisions() {
-  // Check each obstacle for a collision with player
-  for (Obstacle obs : obstacles) {
-    // Check collision with top or bottom obstacle
-    if ((playerY < obs.gapY - OBSTACLE_GAP / 2 || playerY + PLAYER_SIZE > obs.gapY + OBSTACLE_GAP / 2) &&
-        (PLAYER_START_X + PLAYER_SIZE > obs.x && PLAYER_START_X < obs.x + OBSTACLE_WIDTH)) {
-      gameOver();
+  // Check each platform for a collision with player
+  for (Platform plat : platforms) {
+    // Check if the player is falling and lands on a platform
+    if (velocityY > 0 && playerY + PLAYER_SIZE <= plat.y && playerY + PLAYER_SIZE + velocityY >= plat.y &&
+        PLAYER_START_X + PLAYER_SIZE > plat.x && PLAYER_START_X < plat.x + plat.width) {
+      // Landed on platform, reset velocity
+      playerY = plat.y - PLAYER_SIZE;
+      velocityY = 0;
     }
   }
 }
@@ -144,16 +163,18 @@ void gameOver() {
 
   // Delay then restart game
   delay(3000);
-  restartGame();
+  startGame();
 }
 
-void restartGame() {
-  obstacles.clear();           // Clear all obstacles
-  playerY = SCREEN_HEIGHT / 2; // Reset player position
-  velocityY = 0;               // Reset player velocity
-  points = 0;                  // Reset points
-  lastObstacleTime = millis(); // Reset the obstacle timer
-  nextObstacleTime = millis(); // Reset the obstacle timer
+void startGame() {
+  platforms.clear();                // Clear all platforms
+  int startPlatformY = SCREEN_HEIGHT - PLATFORM_HEIGHT - PLATFORM_GAP;
+  platforms.push_back({PLAYER_START_X, startPlatformY, MAX_PLATFORM_WIDTH}); // Add initial platform
+  playerY = startPlatformY - PLAYER_SIZE; // Start player on the initial platform
+  velocityY = 0;                    // Reset player velocity
+  points = 0;                       // Reset points
+  lastPlatformTime = millis();      // Reset the platform timer
+  nextPlatformTime = millis();      // Reset the platform timer
 }
 
 void render() {
@@ -162,10 +183,9 @@ void render() {
   // Draw player
   display.fillRect(PLAYER_START_X, playerY, PLAYER_SIZE, PLAYER_SIZE, WHITE);
 
-  // Draw each obstacle
-  for (Obstacle obs : obstacles) {
-    display.fillRect(obs.x, 0, OBSTACLE_WIDTH, obs.gapY - OBSTACLE_GAP / 2, WHITE); // Top obstacle
-    display.fillRect(obs.x, obs.gapY + OBSTACLE_GAP / 2, OBSTACLE_WIDTH, SCREEN_HEIGHT - (obs.gapY + OBSTACLE_GAP / 2), WHITE); // Bottom obstacle
+  // Draw each platform
+  for (Platform plat : platforms) {
+    display.fillRect(plat.x, plat.y, plat.width, PLATFORM_HEIGHT, WHITE);
   }
 
   // Display points
