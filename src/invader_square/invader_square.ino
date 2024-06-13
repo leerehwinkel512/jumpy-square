@@ -1,7 +1,13 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Arduino.h>
+#include <Preferences.h>
+
+Preferences preferences;
+int highScore;
 
 #define BUTTON_A 19
+#define BUTTON_B 18
 #define JOYSTICK_X 39
 #define JOYSTICK_Y 36
 
@@ -10,7 +16,7 @@
 #define OLED_RESET -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#define PLAYER_WIDTH 10
+#define PLAYER_WIDTH 20
 #define PLAYER_HEIGHT 5
 #define BULLET_WIDTH 2
 #define BULLET_HEIGHT 5
@@ -22,6 +28,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define INVADER_NEAR_TOLERANCE 20 // tolerance to shoot
 #define INVADER_SHOOT_CHANCE 3  // chance to shoot when near
 #define BULLET_SPEED 6
+#define BUZZER 4
+#define SOUND_DURATION_MS 5
 
 struct GameObject {
   int x;
@@ -31,7 +39,17 @@ struct GameObject {
   bool exploding; // Flag to indicate explosion state
 };
 
+enum SoundType {
+  FIRE,
+  SCORE,
+  NONE
+};
+
 unsigned long points = 0; // Point counter
+unsigned long soundEnd = 0;
+
+SoundType soundType = NONE;
+bool newSound = false;
 
 GameObject player;
 GameObject bullet;
@@ -44,11 +62,22 @@ int invaderDirection;
 void setup() {
   Serial.begin(9600);
   pinMode(BUTTON_A, INPUT_PULLUP);
+  pinMode(BUTTON_B, INPUT_PULLUP);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
     for (;;);
   }
+
+  // init buzzer
+  if (!ledcAttachChannel(BUZZER, 2000, 8, 0)) { // pin, freq, resolution, channel
+    Serial.println(F("Buzzer pwm init failed"));
+    for (;;);  
+    }
+
+  // get high score
+  preferences.begin("highScore", false);
+  highScore = preferences.getInt("highScore", 0);
 
   showStartupLogo();
   startGame();
@@ -61,7 +90,13 @@ void showStartupLogo() {
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
   display.println("Invader");
-  display.print("Square");
+  display.println("Square");
+
+  display.setTextSize(1);
+  display.println();
+  display.println();    
+  display.print("High Score: ");  
+  display.print(highScore);
 
   display.display();
   delay(3000);
@@ -74,6 +109,7 @@ void loop() {
   handleCollisions();
   moveInvader();
   render();
+  playSound();
 
   delay(100);
 }
@@ -92,6 +128,14 @@ void startGame() {
 }
 
 void updatePlayerMovement() {
+
+  // check hyper jump
+  bool buttonB = !digitalRead(BUTTON_B);
+  if (buttonB) {
+    player.x = random(0, 128);
+  }
+
+  // joystick move
   int joystickX = analogRead(JOYSTICK_X) - 2048; // Center at 0
   if (abs(joystickX) > JOYSTICK_DEADZONE) {
     player.x -= map(joystickX, -2048, 2047, -PLAYER_SPEED, PLAYER_SPEED); // Correctly scaled and inverted
@@ -106,6 +150,9 @@ void handleShooting() {
   if (buttonA && bullet.y == -1) {
     bullet.x = player.x + PLAYER_WIDTH / 2 - BULLET_WIDTH / 2;
     bullet.y = player.y - BULLET_HEIGHT;
+
+    newSound = true;
+    soundType = FIRE;
   }
   if (bullet.y != -1) {
     bullet.y -= BULLET_SPEED;
@@ -117,6 +164,9 @@ void handleShooting() {
       if (random(0, INVADER_SHOOT_CHANCE) == 0) {  // Adds a random chance to shoot
           invaderBullet1.x = invader.x + INVADER_WIDTH / 2 - BULLET_WIDTH / 2;
           invaderBullet1.y = invader.y + INVADER_HEIGHT;
+
+          newSound = true;
+          soundType = FIRE;
       }
   }
   if (invaderBullet1.y != -1) {
@@ -129,6 +179,9 @@ void handleShooting() {
       if (random(0, INVADER_SHOOT_CHANCE) == 0) {  // Adds a random chance to shoot
           invaderBullet2.x = invader.x + INVADER_WIDTH / 2 - BULLET_WIDTH / 2;
           invaderBullet2.y = invader.y + INVADER_HEIGHT;
+
+          newSound = true;
+          soundType = FIRE;          
       }
   }
   if (invaderBullet2.y != -1) {
@@ -141,6 +194,9 @@ void handleShooting() {
       if (random(0, INVADER_SHOOT_CHANCE) == 0) {  // Adds a random chance to shoot
           invaderBullet3.x = invader.x + INVADER_WIDTH / 2 - BULLET_WIDTH / 2;
           invaderBullet3.y = invader.y + INVADER_HEIGHT;
+
+          newSound = true;
+          soundType = FIRE;          
       }
   }
   if (invaderBullet3.y != -1) {
@@ -158,6 +214,9 @@ void handleCollisions() {
     invader.exploding = true; // Set explosion state
     bullet.y = -1; // Reset bullet
 
+    newSound = true;
+    soundType = SCORE;    
+
     points++; // increase points
 
     invader.x = random(0, SCREEN_WIDTH - INVADER_WIDTH); // Reset invader position randomly
@@ -167,7 +226,7 @@ void handleCollisions() {
   if (invaderBullet1.y != -1 && invaderBullet1.x < player.x + PLAYER_WIDTH && invaderBullet1.x + BULLET_WIDTH > player.x &&
       invaderBullet1.y < player.y + PLAYER_HEIGHT && invaderBullet1.y + BULLET_HEIGHT > player.y) {
     player.exploding = true; // Set explosion state
-    invaderBullet1.y = -1; // Reset invader bullet
+    invaderBullet1.y = -1; // Reset invader bullet 
   }
 
   // invader hit player 2
@@ -201,6 +260,12 @@ void moveInvader() {
 
 void render() {
   display.clearDisplay();  // Clear the previous display content
+
+  // Display points
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(SCREEN_WIDTH - 30, 0); // Position the text at the top-right corner
+  display.print(points);  
 
   // player
   display.fillRect(player.x, player.y, player.width, player.height, WHITE);
@@ -237,12 +302,6 @@ void render() {
     display.fillRect(invaderBullet3.x, invaderBullet3.y, BULLET_WIDTH, BULLET_HEIGHT, WHITE);
   }
 
-  // Display points
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(SCREEN_WIDTH - 30, 0); // Position the text at the top-right corner
-  display.print(points);  
-
   display.display();  // Update the display with new content
 }
 
@@ -251,9 +310,47 @@ void gameOver() {
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
   display.println("GAME OVER");
-  display.display();
+
+  if (points > highScore){
+    preferences.putInt("highScore", points);
+    display.println();
+    display.println("New High Score!");
+  }
+
+  display.display();  
 
   // Delay then restart game
-  delay(3000);
+  ledcWriteTone(BUZZER, 250);
+  delay(500);
+  ledcWriteTone(BUZZER, 0);
+  delay(2500);  
   startGame();
+}
+
+void playSound() {
+
+  if (newSound) {
+
+    switch (soundType) {
+      case FIRE:
+        ledcWriteTone(BUZZER, 500); // Play a 500 Hz tone for a Fire
+        break;
+      case SCORE:
+        ledcWriteTone(BUZZER, 1000); // Higher tone for scoring
+        break;
+      default:
+        ledcWriteTone(BUZZER, 0); // No sound
+        break;
+    }
+
+    newSound = false;
+    soundEnd = millis() + SOUND_DURATION_MS;
+  }
+
+  unsigned long currentTime = millis();
+
+  if (currentTime > soundEnd) {
+    ledcWriteTone(BUZZER, 0);
+  }
+
 }
