@@ -16,7 +16,7 @@ int highScore;
 #define OLED_RESET -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#define JOYSTICK_DEADZONE 400
+#define JOYSTICK_DEADZONE 2000
 #define ROTATION_SPEED 0.15f
 
 #define SHIP_SIZE 8
@@ -227,8 +227,8 @@ void loop() {
 }
 
 void handleController() {
-  int joystickX = -(analogRead(JOYSTICK_X) - 2048);
-  int joystickY = analogRead(JOYSTICK_Y) - 2048;
+  int joystickX = analogRead(JOYSTICK_Y) - 2048;
+  int joystickY = analogRead(JOYSTICK_X) - 2048;
 
   // Rotate ship
   if (abs(joystickX) > JOYSTICK_DEADZONE) {
