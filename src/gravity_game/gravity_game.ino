@@ -17,7 +17,7 @@ int highScore;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define JOYSTICK_DEADZONE 2000
-#define ROTATION_SPEED 0.15f
+#define ROTATION_SPEED 0.05f
 
 #define SHIP_SIZE 8
 
