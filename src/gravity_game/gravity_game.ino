@@ -179,7 +179,7 @@ void resetGameObjects() {
     0.0f,                 // direction (in radians)
     SHIP_SIZE,            // size
     false,                // blaster
-    10                    // bullet speed
+    20                    // bullet speed
   };
 
   // Init planets
