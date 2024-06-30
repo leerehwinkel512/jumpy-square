@@ -22,13 +22,13 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define SHIP_SIZE 8
 
 #define MIN_BULLET_SPEED 0
-#define MAX_BULLET_SPEED 20
+#define MAX_BULLET_SPEED 15
 #define MAX_BULLET_DISTANCE 100
 #define BULLET_SIZE 1
 
 #define PLANET_SIZE 5
 #define GRAVITATIONAL_CONSTANT 2.0f
-#define MAX_PLANETS 3
+#define MAX_PLANETS 4
 #define SIDE_BUFFER 10
 #define LEFT_SIDE_BUFFER 35
 #define MIN_PLANET_DISTANCE 20
@@ -179,7 +179,7 @@ void resetGameObjects() {
     0.0f,                 // direction (in radians)
     SHIP_SIZE,            // size
     false,                // blaster
-    20                    // bullet speed
+    15                    // bullet speed
   };
 
   // Init planets
