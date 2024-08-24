@@ -22,7 +22,7 @@ TFT_eSPI tft = TFT_eSPI();
 
 #define SHIP_SIZE 12
 
-#define MAX_SHIP_SPEED 3.0f
+#define MAX_SHIP_SPEED 4.0f
 #define SHIP_THRUST 0.2f
 
 #define BULLET_SIZE 1
@@ -39,7 +39,7 @@ TFT_eSPI tft = TFT_eSPI();
 #define BUZZER 25
 #define SOUND_DURATION_MS 10
 
-#define SAFE_ZONE_SIZE 50 // Size of the safe zone around the ship
+#define SAFE_ZONE_SIZE 150 // Size of the safe zone around the ship
 
 struct Ship {
   float x, y;
@@ -186,7 +186,7 @@ void resetGameObjects() {
 
 
 unsigned long lastUpdate = 0;
-const unsigned long UPDATE_INTERVAL = 50;
+const unsigned long UPDATE_INTERVAL = 60;
 
 void loop() {
   unsigned long currentTime = millis();
@@ -204,7 +204,7 @@ void loop() {
 
   playSound();
 
-  delay(20);  // Adjust for desired frame rate
+  delay(30);  // Adjust for desired frame rate
 }
 
 void handleInput() {
