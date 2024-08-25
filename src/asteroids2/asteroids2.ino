@@ -18,7 +18,7 @@ int highScore;
 TFT_eSPI tft = TFT_eSPI();
 
 #define JOYSTICK_DEADZONE 2000
-#define ROTATION_SPEED 0.1f
+#define ROTATION_SPEED 0.12f
 
 #define SHIP_SIZE 12
 
